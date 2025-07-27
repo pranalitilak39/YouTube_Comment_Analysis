@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 from wordcloud import WordCloud
 from googleapiclient.discovery import build
 import re
-import time
 
 # 🌟 Load YouTube API key securely from secrets
 api_key = st.secrets["api"]["youtube_api_key"]
@@ -55,15 +54,16 @@ def predict_sentiment(comment):
 # 🌟 Clean text function for CSV uploads
 def clean_text(text):
     text = str(text)
-    text = re.sub(r"http\S+", "", text)
-    text = re.sub(r"[^A-Za-z0-9\s]", "", text)
-    text = re.sub(r"\s+", " ", text).strip()
+    text = re.sub(r"http\S+", "", text)  # remove URLs
+    text = re.sub(r"[^A-Za-z0-9\s]", "", text)  # remove special chars except spaces
+    text = re.sub(r"\s+", " ", text).strip()  # remove extra spaces
     return text
 
 
 # 🌟 Streamlit App UI
 st.title("🎬 YouTube Comment Analysis using RoBERTa")
 
+# 🌟 Tabs for structured layout
 tab1, tab2 = st.tabs(["🔴 Live Scraping Analysis", "📁 File Upload Analysis"])
 
 # ========== 🔴 Tab 1: Live Scraping ==========
@@ -87,13 +87,15 @@ with tab1:
                 st.write("-", c)
 
             st.write("### Sentiment Analysis Results:")
-            sentiments, scores = [], []
+            sentiments = []
+            scores = []
             for c in comments:
                 label, score = predict_sentiment(c)
                 sentiments.append(label)
                 scores.append(score)
                 st.write(f"{c[:50]}... ➡ **{label}** ({score:.2f})")
 
+            # ✅ Pie Chart
             st.write("### Sentiment Distribution")
             sentiment_counts = pd.Series(sentiments).value_counts()
             fig, ax = plt.subplots()
@@ -106,6 +108,7 @@ with tab1:
             ax.axis("equal")
             st.pyplot(fig)
 
+            # ✅ Word Cloud
             st.write("### Word Cloud of Comments")
             text_combined = " ".join(comments)
             wordcloud = WordCloud(
@@ -123,29 +126,30 @@ with tab2:
 
     if uploaded_file is not None:
         df = pd.read_csv(uploaded_file)
+
+        # ✅ Convert all column names to lower case for consistent checking
         df.columns = df.columns.str.lower()
 
+        # ✅ Create clean_comment column if missing
         if "clean_comment" not in df.columns:
             if "comment" in df.columns:
                 df["clean_comment"] = df["comment"].apply(clean_text)
             else:
-                st.error("No 'comment' column found in uploaded CSV.")
+                st.error(
+                    "No 'comment' or 'clean_comment' column found in uploaded CSV."
+                )
                 st.stop()
 
         st.write("### Sample Comments Loaded")
         st.write(df.head())
 
-        run_analysis = st.button("Run Sentiment Analysis")
-        if run_analysis:
+        st.write("Current columns in df:", df.columns)
+
+        if st.button("Run Sentiment Analysis"):
             sentiments, scores = [], []
-            progress_bar = st.progress(0)
-            status_text = st.empty()
 
-            comments_list = df["clean_comment"].tolist()
-            total_comments = len(comments_list)
-
-            for i, comment in enumerate(comments_list):
-                status_text.text(f"Processing comment {i+1}/{total_comments}...")
+            # ✅ Run sentiment analysis on clean_comment column
+            for comment in df["clean_comment"]:
                 if pd.isnull(comment) or str(comment).strip() == "":
                     sentiments.append("neutral")
                     scores.append(0.0)
@@ -153,17 +157,14 @@ with tab2:
                     label, score = predict_sentiment(comment)
                     sentiments.append(label)
                     scores.append(score)
-                progress_bar.progress((i + 1) / total_comments)
 
             df["sentiment"] = sentiments
             df["score"] = scores
 
-            status_text.text("Sentiment analysis completed!")
-            progress_bar.empty()
-
             st.write("### Comments with Sentiment")
             st.write(df.head(10))
 
+            # ✅ Pie Chart
             st.write("### Sentiment Distribution")
             sentiment_counts = df["sentiment"].value_counts()
             fig2, ax2 = plt.subplots()
@@ -176,6 +177,7 @@ with tab2:
             ax2.axis("equal")
             st.pyplot(fig2)
 
+            # ✅ Word Cloud
             st.write("### Word Cloud of Comments")
             text_combined = " ".join(df["clean_comment"].dropna().tolist())
             wordcloud = WordCloud(
@@ -186,6 +188,7 @@ with tab2:
             plt.axis("off")
             st.pyplot(plt)
 
+            # ✅ Download button for results
             st.download_button(
                 "Download Results CSV",
                 data=df.to_csv(index=False),

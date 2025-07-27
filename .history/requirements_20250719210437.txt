@@ -4,4 +4,6 @@ torch
 pandas
 matplotlib
 wordcloud
-google-api-python-client
+pytorch
+numpy
+pyplot
